@@ -7,6 +7,8 @@
 # python3 setup.py build_ext --inplace
 # python3 setup.py bdist
 # python3 setup.py sdist bdist_wheel
+# twine upload --repository testpypi dist/*
+# twine upload --verbose --username __token__ --password <the pypi token> dist/*
 #
 # python3 setup.py bdist_wheel
 # pip3 install -e . # -e makes symlinks to the source folder and allows editing the source code without having to reinstall the package
@@ -31,7 +33,7 @@ with io.open(os.path.join(here, "README.md"), encoding="utf-8") as f:
 
 setup(
     name='Qbluetoothctl_helper',
-    version='0.0.1',
+    version='0.0.2',
     description="Python bluetoothctl helper for QT.",
     url='https://github.com/uutzinger/Qbluetoothctl_helper',
     author='Urs Utzinger',
