@@ -1,5 +1,5 @@
 ############################################################################################
-# Qt Bluetoothctl Helper
+# Qt Bluetoothctl Wrapper
 ############################################################################################
 # This module provides a class to interact with linux bluetoothctl utility.
 # It is designed to be used in a PyQt application.
@@ -81,7 +81,6 @@ class BluetoothctlWrapper(QObject):
 
     Slots
 
-        emit_log(int level, str message):                           Emits a log signal with the specified level and message.
         start(str expected_startup_output, int timeout_duration):   Starts the process with expected output and a timeout.
         stop():                                                     Stops the process gracefully.
         send_str(str text):                                         Sends text input (like a PIN) during pairing.
@@ -100,18 +99,26 @@ class BluetoothctlWrapper(QObject):
         distrust(str mac, int timeout=2000):                        Attempts to distrust a device by its MAC address.
         connect(str mac, int timeout=5000):                         Attempts to connect to a device by its MAC address.
         disconnect(str mac, int timeout=2000):                      Attempts to disconnect a device by its MAC address.
+        emit_log(int level, str message):                           Emits a log signal with the specified level and message.
 
     """
     
     # Constants
     ################################################################################################
+
+    # default values if none are provided to the function calls
     STARTUP_TIMEOUT         = 5000  # 5 seconds
-    WAIT_FOR_FINISHED       = 2000
+    WAIT_FOR_FINISHED       = 2000  # 2 seconds
     RETRY_INTERVALS         = [150, 200, 500]
-    TOTAL_RETRY_TIME        = 5000
-    COMMAND_TIMEOUT         = 5000
+    TOTAL_RETRY_TIME        = 5000  # for send command
+    COMMAND_TIMEOUT         = 5000  #
+
+    # Output after executing start() command
 
     C_STARTUP_EXPECTED_OUTPUT = "Agent registered"
+
+    # Suggested Initialization Commands
+
     # "agent off", 
     C_AGENT_OFF              = "Agent unregistered"
     # "agent on", 
@@ -130,6 +137,9 @@ class BluetoothctlWrapper(QObject):
     C_DISCOVERABLE_ON        = "Changing discoverable on succeeded"
     #"discoverable off", 
     C_DISCOVERABLE_OFF       = "Changing discoverable off succeeded"
+
+    # bleutoothctl commands
+
     # "devices", 
     NAME_PATTERN             = re.compile(r"Device\s+([A-F0-9:]+)\s+(.*)")
     MAC_PATTERN              = re.compile(r"([0-9A-Fa-f]{2}:){5}([0-9A-Fa-f]{2})")
@@ -166,37 +176,43 @@ class BluetoothctlWrapper(QObject):
 
     # Signals
     ################################################################################################
-    log_signal                   = pyqtSignal(int, str)  # Emitted for logging purposes
-    output_ready_signal          = pyqtSignal(str) # Emitted when new output is ready
-    error_ready_signal           = pyqtSignal(str) # Emitted when an error occurs
-    finished_signal              = pyqtSignal()    # Emitted when the process finishes
-    command_completed_signal     = pyqtSignal()    # Emitted when command output is verified
-    command_failed_signal        = pyqtSignal()    # Emitted if command failed
-    command_expired_signal       = pyqtSignal()    # Emitted if command expired
-    timeout_signal               = pyqtSignal()    # Emitted if output verification times out
-    startup_completed_signal     = pyqtSignal()    # Emitted when the expected output is found during _handle_startup_output
-    all_commands_processed_signal = pyqtSignal()   # Emitted when all commands are processed
+    log_signal                       = pyqtSignal(int, str)  # Emitted for logging purposes
+    output_ready_signal              = pyqtSignal(str) # Emitted when new output is ready
+    error_ready_signal               = pyqtSignal(str) # Emitted when an error occurs
+    finished_signal                  = pyqtSignal()    # Emitted when the process finishes
+    startup_completed_signal         = pyqtSignal()    # Emitted when the expected output is found during _handle_startup_output
 
-    device_scan_started_signal     = pyqtSignal()     # Emitted when device scanning is started
-    device_scan_start_failed_signal = pyqtSignal()     # Emitted when device scanning is started
-    device_scan_stopped_signal     = pyqtSignal()     # Emitted when device scanning is stopped
-    device_scan_stop_failed_signal  = pyqtSignal()     # Emitted when device scanning is stopped
+    command_completed_signal         = pyqtSignal()    # Emitted when command output is verified
+    command_failed_signal            = pyqtSignal()    # Emitted if command failed
+    command_expired_signal           = pyqtSignal()    # Emitted if command expired
+    timeout_signal                   = pyqtSignal()    # Emitted if output verification times out
+    all_commands_processed_signal    = pyqtSignal()    # Emitted when all commands are processed
+
+    device_scan_started_signal       = pyqtSignal()    # Emitted when device scanning is started
+    device_scan_start_failed_signal  = pyqtSignal()    # Emitted when device scanning is started
+    device_scan_stopped_signal       = pyqtSignal()    # Emitted when device scanning is stopped
+    device_scan_stop_failed_signal   = pyqtSignal()    # Emitted when device scanning is stopped
+
     device_found_signal              = pyqtSignal(str, str)   # Emits MAC address and name
-    device_not_found_signal          = pyqtSignal(str)  # Emits the target device
-    device_info_ready_signal         = pyqtSignal(dict) # Emits device_info dictionary
-    device_info_failed_signal        = pyqtSignal(str)  # Emits the MAC address if retrieval fails
-    device_pair_succeeded_signal     = pyqtSignal(str)  # Emits device_info dictionary
-    device_pair_failed_signal        = pyqtSignal(str)  # Emits the MAC address if retrieval fails
-    device_remove_succeeded_signal   = pyqtSignal(str)  # Emits the MAC address on device removal success
-    device_remove_failed_signal      = pyqtSignal(str)  # Emits the MAC address on device removal failure
-    device_connect_succeeded_signal  = pyqtSignal(str)  # Emits the MAC address on device connection success
-    device_connect_failed_signal     = pyqtSignal(str)  # Emits the MAC address on device connection failure
+    device_not_found_signal          = pyqtSignal(str) # Emits the target device
+
+    device_info_ready_signal         = pyqtSignal(dict)# Emits device_info dictionary
+    device_info_failed_signal        = pyqtSignal(str) # Emits the MAC address if retrieval fails
+
+    device_pair_succeeded_signal     = pyqtSignal(str) # Emits device_info dictionary
+    device_pair_failed_signal        = pyqtSignal(str) # Emits the MAC address if retrieval fails
+    device_remove_succeeded_signal   = pyqtSignal(str) # Emits the MAC address on device removal success
+    device_remove_failed_signal      = pyqtSignal(str) # Emits the MAC address on device removal failure
+
+    device_connect_succeeded_signal  = pyqtSignal(str) # Emits the MAC address on device connection success
+    device_connect_failed_signal     = pyqtSignal(str) # Emits the MAC address on device connection failure
     device_disconnect_succeeded_signal = pyqtSignal(str)  # Emits the MAC address on device disconnect success
-    device_disconnect_failed_signal  = pyqtSignal(str)      # Emits the MAC address on device disconnect failure
-    device_trust_succeeded_signal    = pyqtSignal(str)  # Emits the MAC address on device trust success
-    device_trust_failed_signal       = pyqtSignal(str)  # Emits the MAC address on device trust failure
-    device_distrust_succeeded_signal = pyqtSignal(str)  # Emits the MAC address on device distrust success
-    device_distrust_failed_signal    = pyqtSignal(str)      # Emits the MAC address on device distrust failure
+    device_disconnect_failed_signal  = pyqtSignal(str) # Emits the MAC address on device disconnect failure
+
+    device_trust_succeeded_signal    = pyqtSignal(str) # Emits the MAC address on device trust success
+    device_trust_failed_signal       = pyqtSignal(str) # Emits the MAC address on device trust failure
+    device_distrust_succeeded_signal = pyqtSignal(str) # Emits the MAC address on device distrust success
+    device_distrust_failed_signal    = pyqtSignal(str) # Emits the MAC address on device distrust failure
 
     def __init__(self, process_command: str, parent=None):
         super().__init__(parent)
@@ -254,7 +270,7 @@ class BluetoothctlWrapper(QObject):
 
     @pyqtSlot()
     def _handle_startup_output(self):
-        """Handle startup output."""
+        """Handle startup output.Expects process output indicating bluetoothctl agent is present"""
 
         # Read the output from the process
         output = self.process.readAllStandardOutput().data().decode().strip()
@@ -355,14 +371,14 @@ class BluetoothctlWrapper(QObject):
 
     @pyqtSlot(QProcess.ProcessState)
     def _handle_state_changed(self, new_state):
-        """Handle state changes of the QProcess."""
+        """Handle state changes of the QProcess from starting to running."""
         if new_state == QProcess.Running and self.startup_expected_text_found:
             self.emit_log(logging.INFO, f"[{int(QThread.currentThreadId())}]: Process is now running.")
             self.startup_completed_signal.emit()
 
     @pyqtSlot()
     def _handle_startup_timeout(self):
-        """Handle the case when waiting for output times out."""
+        """Handle the case when waiting for exepcted startup times out."""
         self.emit_log(logging.ERROR, f"Timeout occurred while waiting for expected output: \"{self.expected_startup_output}\"")
 
         try:
@@ -388,7 +404,7 @@ class BluetoothctlWrapper(QObject):
     def send_str(self, text: str):
         """
         Send the text such as PIN during the pairing process.
-        This command is sent without expecting an explicit confirmation.
+        The text is sent without expecting an explicit confirmation.
         """
         if self.process.state() == QProcess.Running:
             self.process.write((text + '\n').encode())  # Write the text to the process without expecting feedback
@@ -470,7 +486,7 @@ class BluetoothctlWrapper(QObject):
 
     @pyqtSlot()
     def _handle_command_output(self):
-        """Handle output related to command verification."""
+        """Handle output for command verification."""
         output = self.process.readAllStandardOutput().data().decode().strip()
         self.output_buffer += output
 
@@ -481,7 +497,7 @@ class BluetoothctlWrapper(QObject):
 
     @pyqtSlot()
     def _verify_command_result(self):
-        """Verify if the expected output is present in the buffer."""
+        """Verify if the expected output is present in the output buffer."""
 
         # if self.stop_verification:
         #     self.emit_log(logging.WARNING, f"[{int(QThread.currentThreadId())}]: Verification should be stopped.")
@@ -596,7 +612,7 @@ class BluetoothctlWrapper(QObject):
         self._send_next_command()
 
     def _on_multicommand_expired(self):
-        # Command expired, handle accordingly
+        # Commands timed out, handle accordingly
         self.emit_log(logging.ERROR, f"Command '{self.pending_command}' expired.")
         self._send_next_command()
 
@@ -793,7 +809,7 @@ class BluetoothctlWrapper(QObject):
         self.parse_device_timeout_timer.start(1000)
 
     def _handle_devices_output(self):
-        """Collect output specifically for 'devices' command."""
+        """Collect output from 'devices' command."""
         if self.collecting_devices_output:
             output = self.process.readAllStandardOutput().data().decode()
             self.devices_output_buffer += output
@@ -932,7 +948,7 @@ class BluetoothctlWrapper(QObject):
         self.parse_info_timeout_timer.start(timeout)
 
     def _handle_info_output(self):
-        """Collect output specifically for 'info' command."""
+        """Collect output from 'info' command."""
         if self.collecting_info_output:
             output = self.process.readAllStandardOutput().data().decode()
             self.info_output_buffer += output
@@ -1134,7 +1150,7 @@ class BluetoothctlWrapper(QObject):
         self.parse_pair_timeout_timer.start(self.pair_timeout)
 
     def _handle_pair_output(self):
-        """Collect output specifically for 'pair' command."""
+        """Collect output from 'pair' command."""
         if self.collecting_pair_output:
             output = self.process.readAllStandardOutput().data().decode()
             self.pair_output_buffer += output
@@ -1542,7 +1558,8 @@ if __name__ == "__main__":
     
     wrapper = BluetoothctlWrapper("bluetoothctl")
 
-    # Connect signals to handle output and other events
+
+    # Connect wrapper signals to handle output and other events
     wrapper.output_ready_signal.connect(    lambda output:  print(f"MAIN: Output: {output}"))
     wrapper.error_ready_signal.connect(     lambda error:   print(f"MAIN: Error: {error}"))
     wrapper.finished_signal.connect(        lambda:         print( "MAIN: Process finished."))
@@ -1580,6 +1597,17 @@ if __name__ == "__main__":
 
     # Multiple Commands Example
     ###########################
+    #
+    # This will 
+    #  1 startup the bluetoothctl process
+    #  2 find specified device
+    #  3 obtain device info
+    #  4 remove the device it its already paired
+    #  5 find the device again
+    #  6 obtain device infor 
+    #  7 pair with the device
+    #  8 connect to the device
+    #  9 trust the device
 
     # Define the commands and expected responses
     commands = [
@@ -1688,9 +1716,6 @@ if __name__ == "__main__":
         print(f"MAIN: {mac} trusted.")
         # Proceed with further actions, e.g., pairing or connecting
         wrapper.stop()
-        #
-        # END OF TESTING
-        #
  
     def on_trusting_failed(mac):
         print(f"MAIN: {mac} trusting failed.")
